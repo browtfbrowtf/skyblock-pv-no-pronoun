@@ -110,10 +110,6 @@
             "@value": "Align Category Buttons Left",
             "desc": "Align the category buttons to the left side of the screen instead of the right."
         },
-        "show_pronouns": {
-            "@value": "Show Pronouns",
-            "desc": "Show the pronouns of the player in the profile viewer if available."
-        },
         "party_finder_message": {
             "@value": "Party Finder Message",
             "desc": "Shows a breakdown of the joined player's profile in chat, giving you a quick overview.",
@@ -320,7 +316,6 @@
         }
     },
     "widgets": {
-        "pronouns": "Pronouns: <0>",
         "open_settings": [
             "<underline><gray>Open Settings</gray></underline>",
             "You can also use <gray>/sbpv</gray>!"
@@ -401,7 +396,6 @@
                 "progress_to_max": "Progress to max: ",
                 "unknown": "<red>Unknown</red>"
             },
-            "pronouns_hint": "Provided by https://pronoundb.org/",
             "status": {
                 "load": "<white>Load Status</white>",
                 "loading": "<white>Loading...</white>",

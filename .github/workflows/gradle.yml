@@ -1,33 +1,63 @@
-name: Build
+name: Build Release
 
+# Controls when the action will run.
+# Publishes a rolling "latest" release on every push to master (this is the
+# branch this fork maintains), and can also be triggered manually.
 on:
-    push:
-        branches: [ "*" ]
-    pull_request:
-        branches: [ "*" ]
+  workflow_dispatch:
+  push:
+    branches:
+      - master
 
+# The built-in GITHUB_TOKEN can publish a release in THIS repo with contents:write,
+# so no custom API key / PAT is required.
 permissions:
-    contents: read
+  contents: write
+
 jobs:
-    build:
-        runs-on: ubuntu-latest
-        steps:
-            -   uses: actions/checkout@v5
-            -   name: Setup JDK 25
-                uses: actions/setup-java@v5
-                with:
-                    distribution: temurin
-                    java-version: '25'
-            -   name: Setup gradle
-                uses: gradle/actions/setup-gradle@v5
-            -   run: chmod +x gradlew
-            -   name: Build
-                run: ./gradlew build
-            -   uses: actions/upload-artifact@v7.0.0
-                with:
-                    archive: false
-                    path: build/libs/*-26.1.jar
-            -   uses: actions/upload-artifact@v7.0.0
-                with:
-                    archive: false
-                    path: build/libs/*-26.2.jar
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up JDK 25
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'microsoft'
+          java-version: '25'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v5
+        with:
+          cache-disabled: true
+      - run: chmod +x gradlew
+      - name: Build with Gradle
+        run: ./gradlew build
+
+      - name: Upload artifact (26.2)
+        uses: actions/upload-artifact@v7
+        with:
+          name: SkyBlockPv-26.2
+          path: build/libs/*-26.2.jar
+
+      - name: Upload artifact (26.1)
+        uses: actions/upload-artifact@v7
+        with:
+          name: SkyBlockPv-26.1
+          path: build/libs/*-26.1.jar
+
+      # Rolling release: reuses the fixed "latest" tag, so every run overwrites the
+      # same release and the repo's Latest release is always the freshest build.
+      # The jars are MC-version-specific; both are attached to the single release.
+      - name: Publish GitHub Release (rolling "latest")
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest build
+          target_commitish: ${{ github.sha }}
+          files: |
+            build/libs/*-26.2.jar
+            build/libs/*-26.1.jar
+          make_latest: true
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"

@@ -41,7 +41,6 @@ import me.owdding.skyblockpv.utils.components.PvWidgets
 import me.owdding.skyblockpv.utils.displays.ExtraDisplays.grayText
 import me.owdding.skyblockpv.utils.theme.PvColors
 import me.owdding.skyblockpv.utils.theme.ThemeSupport
-import me.owdding.skyblockpv.widgets.PronounWidget
 import net.minecraft.client.gui.layouts.Layout
 import net.minecraft.client.gui.layouts.LayoutElement
 import net.minecraft.client.gui.layouts.LinearLayout
@@ -249,9 +248,6 @@ class MainScreen(gameProfile: GameProfile, profile: SkyBlockProfile? = null) : B
         layout.addChild(SpacerElement.height(5))
         layout.addChild(getStatusButton().withSize(width, 20))
         layout.addChild(SpacerElement.height(3))
-        if (Config.showPronouns) {
-            layout.addChild(PronounWidget.getPronounDisplay(gameProfile.id, width).asWidget())
-        }
 
         return layout
     }

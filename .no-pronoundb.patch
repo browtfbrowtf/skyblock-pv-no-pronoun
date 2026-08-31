@@ -1,0 +1,275 @@
+diff --git a/README.md b/README.md
+index 9b55c6f..852081e 100644
+--- a/README.md
++++ b/README.md
+@@ -22,7 +22,6 @@ The Profile Viewer can be opened with ``/pv`` for your own Profile, or ``/pv <us
+ ## Features
+
+ - **Profile Spying**: Adds a button into the Hypixel Profile Viewer to open this Profile Viewer.
+-- **PronounDB**: Integrates with [PronounDB](https://pronoundb.org/) to display the player's pronouns.
+ - **Party Finder**: Sends a message to open the Profile Viewer for the player that just joined a party finder party.
+ - **Replace Social Options**: Replaces Hypixel's "Click to open social options" with "Click to open Profile Viewer" on chat messages.
+ - **Scaling** (_Experimental_): Automatically scales up some elements based on the player's screen size, to make it more readable on larger screens.
+diff --git a/src/lang/en_us.json b/src/lang/en_us.json
+index d20ec30..2362887 100644
+--- a/src/lang/en_us.json
++++ b/src/lang/en_us.json
+@@ -110,10 +110,6 @@
+             "@value": "Align Category Buttons Left",
+             "desc": "Align the category buttons to the left side of the screen instead of the right."
+         },
+-        "show_pronouns": {
+-            "@value": "Show Pronouns",
+-            "desc": "Show the pronouns of the player in the profile viewer if available."
+-        },
+         "party_finder_message": {
+             "@value": "Party Finder Message",
+             "desc": "Shows a breakdown of the joined player's profile in chat, giving you a quick overview.",
+@@ -320,7 +316,6 @@
+         }
+     },
+     "widgets": {
+-        "pronouns": "Pronouns: <0>",
+         "open_settings": [
+             "<underline><gray>Open Settings</gray></underline>",
+             "You can also use <gray>/sbpv</gray>!"
+@@ -401,7 +396,6 @@
+                 "progress_to_max": "Progress to max: ",
+                 "unknown": "<red>Unknown</red>"
+             },
+-            "pronouns_hint": "Provided by https://pronoundb.org/",
+             "status": {
+                 "load": "<white>Load Status</white>",
+                 "loading": "<white>Loading...</white>",
+diff --git a/src/lang/nl_nl.json b/src/lang/nl_nl.json
+index f6c93e8..f7dba59 100644
+--- a/src/lang/nl_nl.json
++++ b/src/lang/nl_nl.json
+@@ -110,10 +110,6 @@
+             "@value": "Lijn Catagorie Knoppen Links Uit",
+             "desc": "Lijn catagorie knoppen uit an de linker kant van het scherm in plaats van rechts."
+         },
+-        "show_pronouns": {
+-            "@value": "Laat Voornaamwoorden Zien",
+-            "desc": "Laat de voornaamwoorden van de speler zijn in de profile viewer als die beschikbaar zijn."
+-        },
+         "party_finder_message": {
+             "@value": "Party Vinder Bericht",
+             "desc": "Laat een breakdown zien van de speler die net gejoind is in chat, om je snel een overzicht te geven.",
+@@ -319,7 +315,6 @@
+         }
+     },
+     "widgets": {
+-        "pronouns": "Voornaamwoorden: <0>",
+         "open_settings": [
+             "<underline><gray>Open Instellingen</gray></underline>",
+             "Je kan ook <gray>/sbpv</gray> gebruiken!"
+@@ -400,7 +395,6 @@
+                 "progress_to_max": "Voortgang naar max: ",
+                 "unknown": "<red>Onbekend</red>"
+             },
+-            "pronouns_hint": "Aangeleverd door https://pronoundb.org/",
+             "status": {
+                 "load": "<white>Laad Status</white>",
+                 "loading": "<white>Aan het laden...</white>",
+diff --git a/src/main/kotlin/me/owdding/skyblockpv/api/pronouns/PronounDbDecorations.kt b/src/main/kotlin/me/owdding/skyblockpv/api/pronouns/PronounDbDecorations.kt
+deleted file mode 100644
+index e82c4f6..0000000
+--- a/src/main/kotlin/me/owdding/skyblockpv/api/pronouns/PronounDbDecorations.kt
++++ /dev/null
+@@ -1,34 +0,0 @@
+-package me.owdding.skyblockpv.api.pronouns
+-
+-import com.mojang.serialization.Codec
+-import me.owdding.lib.rendering.text.TextShader
+-import me.owdding.lib.rendering.text.builtin.GradientTextShader
+-import me.owdding.skyblockpv.utils.Utils
+-import me.owdding.skyblockpv.utils.codecs.DefaultedData
+-import me.owdding.skyblockpv.utils.codecs.LoadData
+-import net.minecraft.network.chat.TextColor
+-
+-@LoadData
+-object PronounDbDecorations : DefaultedData {
+-
+-    private val CODEC: Codec<Map<String, DecorationDefinition>> = Codec.unboundedMap(
+-        Codec.STRING,
+-        TextColor.CODEC.listOf().xmap(::DecorationDefinition, DecorationDefinition::colors),
+-    )
+-
+-    private var decorations: Map<String, DecorationDefinition> = emptyMap()
+-
+-    override suspend fun load() {
+-        decorations = Utils.loadRemoteRepoData("pv/pronoun_decorations", CODEC)
+-    }
+-
+-    fun getShader(id: String): TextShader? = decorations[id]?.shader
+-}
+-
+-data class DecorationDefinition(
+-    val colors: List<TextColor>,
+-) {
+-
+-    val shader by lazy { GradientTextShader(*colors.toTypedArray()) }
+-
+-}
+diff --git a/src/main/kotlin/me/owdding/skyblockpv/api/pronouns/PronounsDbAPI.kt b/src/main/kotlin/me/owdding/skyblockpv/api/pronouns/PronounsDbAPI.kt
+deleted file mode 100644
+index 5c64e2b..0000000
+--- a/src/main/kotlin/me/owdding/skyblockpv/api/pronouns/PronounsDbAPI.kt
++++ /dev/null
+@@ -1,75 +0,0 @@
+-package me.owdding.skyblockpv.api.pronouns
+-
+-import com.google.gson.JsonArray
+-import com.google.gson.JsonObject
+-import kotlinx.coroutines.runBlocking
+-import me.owdding.skyblockpv.SkyBlockPv
+-import me.owdding.skyblockpv.utils.json.getAs
+-import me.owdding.skyblockpv.utils.json.getPathAs
+-import tech.thatgravyboat.skyblockapi.utils.extentions.asStringList
+-import tech.thatgravyboat.skyblockapi.utils.http.Http
+-import java.util.*
+-import java.util.concurrent.CompletableFuture
+-
+-private const val API_URL = "https://pronoundb.org/api/v2/lookup"
+-
+-object PronounsDbAPI {
+-
+-    private val pronouns = mutableMapOf<UUID, PronounDbData>()
+-
+-    suspend fun get(uuid: UUID) = pronouns.getOrPut(uuid) {
+-        try {
+-
+-            val id = uuid.toString()
+-            val result = Http.getResult<JsonObject>(
+-                url = API_URL,
+-                headers = mapOf("User-Agent" to SkyBlockPv.useragent),
+-                queries = mapOf(
+-                    "ids" to id,
+-                    "platform" to "minecraft",
+-                ),
+-            ).getOrNull()
+-
+-            result?.getAsJsonObject(id)?.let { data ->
+-                val decoration = data.getAs<String>("decoration")
+-                val pronouns = data.getPathAs<JsonArray>("sets.en")?.asStringList()?.mapNotNull(ProunounSet::fromId) ?: emptyList()
+-                PronounDbData(decoration, pronouns)
+-            } ?: PronounDbData()
+-        } catch (e: Exception) {
+-            e.printStackTrace()
+-            PronounDbData() // Return empty data on error
+-        }
+-    }
+-
+-    fun getProunouns(uuid: UUID): PronounDbData {
+-        return runBlocking { get(uuid) }
+-    }
+-
+-    fun getPronounsAsync(uuid: UUID): CompletableFuture<PronounDbData> {
+-        return CompletableFuture.supplyAsync { getProunouns(uuid) }
+-    }
+-}
+-
+-data class PronounDbData(
+-    val decoration: String? = null,
+-    val pronouns: List<ProunounSet> = emptyList(),
+-)
+-
+-enum class ProunounSet(val id: String, val first: String, val second: String) {
+-    UNKNOWN("unknown", "?", "?"),
+-
+-    HE_HIM("he", "he", "him"),
+-    IT_ITS("it", "it", "its"),
+-    SHE_HER("she", "she", "her"),
+-    THEY_THEM("they", "they", "them"),
+-
+-    ANY("any", "any", "any"),
+-    ASK("ask", "ask", "ask"),
+-    AVOID("avoid", "avoid", "avoid"),
+-    OTHER("other", "other", "other")
+-    ;
+-
+-    companion object {
+-        fun fromId(id: String) = entries.firstOrNull { it.id == id }
+-    }
+-}
+diff --git a/src/main/kotlin/me/owdding/skyblockpv/config/Config.kt b/src/main/kotlin/me/owdding/skyblockpv/config/Config.kt
+index 75de77d..7bfcb0b 100644
+--- a/src/main/kotlin/me/owdding/skyblockpv/config/Config.kt
++++ b/src/main/kotlin/me/owdding/skyblockpv/config/Config.kt
+@@ -44,7 +44,6 @@ object Config : ConfigKt("skyblockpv/config") {
+     var profileChatClickOther by boolean(false) { this.translation = "skyblockpv.config.chat_other" }
+     var currency by enum(ConfigCurrency.USD) { this.translation = "skyblockpv.config.currency" }
+     var alignCategoryButtonsLeft by boolean(true) { this.translation = "skyblockpv.config.align_category_buttons_left" }
+-    var showPronouns by boolean(true) { this.translation = "skyblockpv.config.show_pronouns" }
+     var partyFinderMessage by enum(PartyFinderJoin.State.OPEN_PV) { this.translation = "skyblockpv.config.party_finder_message" }
+     var disableOutsideHypixel by boolean(false) { this.translation = "skyblockpv.config.disable_outside_hypixel" }
+     var skillOverflow by boolean(false) { this.translation = "skyblockpv.config.skill_overflow" }
+diff --git a/src/main/kotlin/me/owdding/skyblockpv/screens/windowed/tabs/MainScreen.kt b/src/main/kotlin/me/owdding/skyblockpv/screens/windowed/tabs/MainScreen.kt
+index 21cd907..92b63b4 100644
+--- a/src/main/kotlin/me/owdding/skyblockpv/screens/windowed/tabs/MainScreen.kt
++++ b/src/main/kotlin/me/owdding/skyblockpv/screens/windowed/tabs/MainScreen.kt
+@@ -41,7 +41,6 @@ import me.owdding.skyblockpv.utils.components.PvWidgets
+ import me.owdding.skyblockpv.utils.displays.ExtraDisplays.grayText
+ import me.owdding.skyblockpv.utils.theme.PvColors
+ import me.owdding.skyblockpv.utils.theme.ThemeSupport
+-import me.owdding.skyblockpv.widgets.PronounWidget
+ import net.minecraft.client.gui.layouts.Layout
+ import net.minecraft.client.gui.layouts.LayoutElement
+ import net.minecraft.client.gui.layouts.LinearLayout
+@@ -249,9 +248,6 @@ class MainScreen(gameProfile: GameProfile, profile: SkyBlockProfile? = null) : B
+         layout.addChild(SpacerElement.height(5))
+         layout.addChild(getStatusButton().withSize(width, 20))
+         layout.addChild(SpacerElement.height(3))
+-        if (Config.showPronouns) {
+-            layout.addChild(PronounWidget.getPronounDisplay(gameProfile.id, width).asWidget())
+-        }
+ 
+         return layout
+     }
+diff --git a/src/main/kotlin/me/owdding/skyblockpv/widgets/PronounWidget.kt b/src/main/kotlin/me/owdding/skyblockpv/widgets/PronounWidget.kt
+deleted file mode 100644
+index 9ac7954..0000000
+--- a/src/main/kotlin/me/owdding/skyblockpv/widgets/PronounWidget.kt
++++ /dev/null
+@@ -1,40 +0,0 @@
+-package me.owdding.skyblockpv.widgets
+-
+-import me.owdding.lib.displays.Display
+-import me.owdding.lib.displays.Displays
+-import me.owdding.lib.displays.centerIn
+-import me.owdding.lib.displays.withTooltip
+-import me.owdding.lib.rendering.text.textShader
+-import me.owdding.skyblockpv.api.pronouns.PronounDbDecorations
+-import me.owdding.skyblockpv.api.pronouns.PronounsDbAPI
+-import me.owdding.skyblockpv.utils.Utils.asTranslated
+-import me.owdding.skyblockpv.utils.Utils.unaryPlus
+-import me.owdding.skyblockpv.utils.displays.ExtraDisplays
+-import me.owdding.skyblockpv.utils.theme.PvColors
+-import tech.thatgravyboat.skyblockapi.helpers.McFont
+-import java.util.*
+-
+-object PronounWidget {
+-    fun getPronounDisplay(uuid: UUID, width: Int): Display {
+-        return ExtraDisplays.completableDisplay(
+-            PronounsDbAPI.getPronounsAsync(uuid),
+-            { (decoration, pronouns) ->
+-                val display = when (pronouns.size) {
+-                    0 -> return@completableDisplay Displays.empty()
+-                    1 -> "${pronouns.first().first}/${pronouns.first().second}"
+-                    else -> pronouns.fold("") { acc, set -> if (acc.isEmpty()) set.first else "$acc/${set.first}" }
+-                }
+-                val shader = PronounDbDecorations.getShader(decoration ?: "")
+-                ExtraDisplays.component(
+-                    component = "widgets.pronouns".asTranslated(display).apply {
+-                        textShader = shader
+-                    },
+-                    color = { PvColors.DARK_GRAY.toUInt() or 0xFF000000u },
+-                    shadow = false,
+-                ).centerIn(width, McFont.height).withTooltip(+"screens.main.pronouns_hint")
+-            },
+-            { ExtraDisplays.text("Error", color = { PvColors.RED.toUInt() }).centerIn(width, McFont.height) },
+-            { ExtraDisplays.text("Loading").centerIn(width, McFont.height) },
+-        )
+-    }
+-}

@@ -110,10 +110,6 @@
             "@value": "Lijn Catagorie Knoppen Links Uit",
             "desc": "Lijn catagorie knoppen uit an de linker kant van het scherm in plaats van rechts."
         },
-        "show_pronouns": {
-            "@value": "Laat Voornaamwoorden Zien",
-            "desc": "Laat de voornaamwoorden van de speler zijn in de profile viewer als die beschikbaar zijn."
-        },
         "party_finder_message": {
             "@value": "Party Vinder Bericht",
             "desc": "Laat een breakdown zien van de speler die net gejoind is in chat, om je snel een overzicht te geven.",
@@ -319,7 +315,6 @@
         }
     },
     "widgets": {
-        "pronouns": "Voornaamwoorden: <0>",
         "open_settings": [
             "<underline><gray>Open Instellingen</gray></underline>",
             "Je kan ook <gray>/sbpv</gray> gebruiken!"
@@ -400,7 +395,6 @@
                 "progress_to_max": "Voortgang naar max: ",
                 "unknown": "<red>Onbekend</red>"
             },
-            "pronouns_hint": "Aangeleverd door https://pronoundb.org/",
             "status": {
                 "load": "<white>Laad Status</white>",
                 "loading": "<white>Aan het laden...</white>",

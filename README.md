@@ -22,7 +22,6 @@ The Profile Viewer can be opened with ``/pv`` for your own Profile, or ``/pv <us
 ## Features
 
 - **Profile Spying**: Adds a button into the Hypixel Profile Viewer to open this Profile Viewer.
-- **PronounDB**: Integrates with [PronounDB](https://pronoundb.org/) to display the player's pronouns.
 - **Party Finder**: Sends a message to open the Profile Viewer for the player that just joined a party finder party.
 - **Replace Social Options**: Replaces Hypixel's "Click to open social options" with "Click to open Profile Viewer" on chat messages.
 - **Scaling** (_Experimental_): Automatically scales up some elements based on the player's screen size, to make it more readable on larger screens.
