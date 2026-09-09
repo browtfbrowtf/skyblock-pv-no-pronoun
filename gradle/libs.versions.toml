@@ -10,7 +10,7 @@ kotlin-gradle-plugin = "2.4.0"
 kotlin-symbol-processor = "2.3.5"
 
 # Dependencies
-skyblockapi = "4.2.18"
+skyblockapi = "4.2.23"
 repolib = "2.0.2"
 
 resourceful-configkt = "4.0.0-beta.1"
@@ -20,7 +20,7 @@ mixinconstraints = "1.0.7"
 
 meowdding-lib = "4.2.12"
 meowdding-ktmodules = "1.0.5"
-meowdding-ktcodecs = "1.0.28"
+meowdding-ktcodecs = "1.1.14"
 meowdding-resources = "1.0.17"
 meowdding-remote-repo = "1.0.4"
 meowdding-auto-mixins = "1.0.5"
