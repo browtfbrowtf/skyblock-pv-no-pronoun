@@ -1,6 +1,7 @@
 package me.owdding.skyblockpv.screens.windowed
 
 import com.mojang.authlib.GameProfile
+import com.mojang.blaze3d.platform.InputConstants
 import com.teamresourceful.resourcefulconfig.api.client.ResourcefulConfigScreen
 import earth.terrarium.olympus.client.components.Widgets
 import earth.terrarium.olympus.client.components.buttons.Button
@@ -19,16 +20,8 @@ import me.owdding.lib.displays.Displays
 import me.owdding.lib.displays.asWidget
 import me.owdding.lib.extensions.getStackTraceString
 import me.owdding.lib.layouts.setPos
-import me.owdding.lib.platform.screens.MouseButtonEvent
-import me.owdding.lib.platform.screens.mouseClicked
 import me.owdding.skyblockpv.SkyBlockPv
-import me.owdding.skyblockpv.api.CachedApis
-import me.owdding.skyblockpv.api.GardenAPI
-import me.owdding.skyblockpv.api.MuseumAPI
-import me.owdding.skyblockpv.api.PlayerAPI
-import me.owdding.skyblockpv.api.ProfileAPI
-import me.owdding.skyblockpv.api.PvAPI
-import me.owdding.skyblockpv.api.StatusAPI
+import me.owdding.skyblockpv.api.*
 import me.owdding.skyblockpv.api.data.SocialEntry
 import me.owdding.skyblockpv.api.data.profile.EmptySkyBlockProfile
 import me.owdding.skyblockpv.api.data.profile.EmptySkyBlockProfile.Reason
@@ -56,15 +49,16 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.client.gui.components.AbstractWidget
 import net.minecraft.client.gui.layouts.FrameLayout
 import net.minecraft.client.gui.layouts.LayoutElement
+import net.minecraft.client.input.MouseButtonEvent
+import net.minecraft.client.input.MouseButtonInfo
 import net.minecraft.network.chat.CommonComponents
 import net.minecraft.util.TriState
-import net.minecraft.util.Util
+import tech.thatgravyboat.skyblockapi.api.location.LocationAPI
 import tech.thatgravyboat.skyblockapi.api.profile.profile.ProfileType
 import tech.thatgravyboat.skyblockapi.helpers.McClient
 import tech.thatgravyboat.skyblockapi.helpers.McFont
+import tech.thatgravyboat.skyblockapi.impl.HypixelPackLoader
 import tech.thatgravyboat.skyblockapi.platform.applyBackgroundBlur
-import tech.thatgravyboat.skyblockapi.utils.extentions.toFormattedName
-import tech.thatgravyboat.skyblockapi.utils.json.Json
 import tech.thatgravyboat.skyblockapi.utils.json.Json.toPrettyString
 import tech.thatgravyboat.skyblockapi.utils.text.Text
 import tech.thatgravyboat.skyblockapi.utils.text.TextColor
@@ -74,6 +68,9 @@ import tech.thatgravyboat.skyblockapi.utils.text.TextStyle.underlined
 import tech.thatgravyboat.skyblockapi.utils.text.TextUtils.splitLines
 import java.nio.file.Files
 import java.util.concurrent.CompletableFuture
+
+//? < 26.3
+//import net.minecraft.util.Util
 
 private const val ASPECT_RATIO = 16.0 / 9.0
 
@@ -140,9 +137,13 @@ abstract class BaseWindowedPvScreen(name: String, gameProfile: GameProfile, prof
         }
 
         // Only add the Title if theres enough width
-        val bottomRowWidth = 100 + if (Config.socials) 105 else 0
+        val maxLeft = 100 + if (Config.socials) 105 else 0
+        val maxRight = 120
+        val maxInwardsThing = maxOf(maxLeft, maxRight)
+
         val titleWidth = McFont.width(this.tabTitle)
-        if (this.uiWidth > bottomRowWidth + titleWidth + 50) {
+
+        if (this.uiWidth > (maxInwardsThing * 2) + titleWidth + 20) {
             addRenderableOnly(
                 PvWidgets.text(this.tabTitle).withCenterAlignment().withSize(this.uiWidth, 20).withPosition(bg.x, bg.bottom + 2),
             )
@@ -187,22 +188,39 @@ abstract class BaseWindowedPvScreen(name: String, gameProfile: GameProfile, prof
     }
 
     private fun LayoutBuilder.createUserRow() = horizontal(5) {
-        val settingsButton =
-            Button().withSize(20, 20).withRenderer(WidgetRenderers.icon<AbstractWidget>(SkyBlockPv.olympusId("icons/edit")).withColor(MinecraftColors.WHITE))
-                .withTexture(null)
-                .withCallback { McClient.setScreenAsync { ResourcefulConfigScreen.getFactory(SkyBlockPv.MOD_ID).apply(this@BaseWindowedPvScreen) } }
-                .withTooltip(+"widgets.open_settings")
+        val settingsButton = Widgets.button {
+            it.withTexture(null)
+            it.withRenderer(WidgetRenderers.icon<AbstractWidget>(SkyBlockPv.olympusId("icons/edit")).withColor(MinecraftColors.WHITE))
+            it.withSize(20, 20)
+            it.withTooltip(+"widgets.open_settings")
+            it.withCallback { McClient.setScreenAsync { ResourcefulConfigScreen.getFactory(SkyBlockPv.MOD_ID).apply(this@BaseWindowedPvScreen) } }
+        }
 
-        val themeSwitcher =
-            Widgets.button().withRenderer(WidgetRenderers.icon<AbstractWidget>(UIIcons.EYE_DROPPER).withColor(MinecraftColors.WHITE)).withSize(20, 20)
-                .withTexture(null).withCallback {
-                    ThemeSupport.nextTheme()
-                    safelyRebuild()
-                    SkyBlockPv.config.save()
-                }.withTooltip("widgets.theme_switcher".asTranslated(ThemeSupport.currentTheme.translation))
+        val themeSwitcher = Widgets.button {
+            it.withTexture(null)
+            it.withRenderer(WidgetRenderers.icon<AbstractWidget>(UIIcons.EYE_DROPPER).withColor(MinecraftColors.WHITE))
+            it.withSize(20, 20)
+            it.withTooltip("widgets.theme_switcher".asTranslated(ThemeSupport.currentTheme.translation))
+            it.withCallback {
+                ThemeSupport.nextTheme()
+                safelyRebuild()
+                SkyBlockPv.config.save()
+            }
+        }
+
+        val applyPackButton = Widgets.button {
+            it.withTexture(null)
+            it.withRenderer(WidgetRenderers.icon<AbstractWidget>(UIIcons.DOWNLOAD).withColor(MinecraftColors.WHITE))
+            it.withSize(20, 20)
+            it.withTooltip(+"widgets.pack_button")
+            it.withCallback {
+                HypixelPackLoader.downloadAndApplyStablePack()
+            }
+        }
 
         widget(settingsButton)
         widget(themeSwitcher)
+        if (!LocationAPI.isOnSkyBlock) widget(applyPackButton)
     }
 
     private fun LayoutBuilder.createDevRow(bg: DisplayWidget) = horizontal(5) {
@@ -228,7 +246,7 @@ abstract class BaseWindowedPvScreen(name: String, gameProfile: GameProfile, prof
             .withCallback { McClient.clipboard = NetworthDisplay.networthDebug(profile).joinToString("\n") }
 
         val saveRawDropdown = Widgets.dropdown(
-            DropdownState<CachedApis>.empty(),
+            DropdownState.empty(),
             CachedApis.entries,
             { Text.of(it.toString()) },
             { button ->
@@ -424,7 +442,7 @@ abstract class BaseWindowedPvScreen(name: String, gameProfile: GameProfile, prof
             if (coopDropdownVisible) {
                 widget(coopMemberDropdown)
                 McClient.runNextTick {
-                    coopMemberDropdown.mouseClicked(MouseButtonEvent(coopMemberDropdown.x + 1.0, coopMemberDropdown.y + 1.0, 1), false)
+                    coopMemberDropdown.mouseClicked(MouseButtonEvent(coopMemberDropdown.x + 1.0, coopMemberDropdown.y + 1.0, MouseButtonInfo(InputConstants.MOUSE_BUTTON_LEFT, 0)), false)
                 }
                 coopDropdownVisible = false
             } else widget(username)
@@ -435,7 +453,7 @@ abstract class BaseWindowedPvScreen(name: String, gameProfile: GameProfile, prof
     private fun createProfileDropdown(bg: DisplayWidget): LayoutElement {
         val width = 100
 
-        val dropdownState = DropdownState<SkyBlockProfile>.of(profile)
+        val dropdownState = DropdownState.of(profile)
         val dropdown = Widgets.dropdown(
             dropdownState,
             profiles,
@@ -486,7 +504,7 @@ abstract class BaseWindowedPvScreen(name: String, gameProfile: GameProfile, prof
         )
 
         val button = Widgets.dropdown(
-            DropdownState<String>.empty(),
+            DropdownState.empty(),
             entries,
             { Text.of(it.name) },
             { button ->
@@ -500,7 +518,7 @@ abstract class BaseWindowedPvScreen(name: String, gameProfile: GameProfile, prof
                         McClient.clipboard = it.url
                         PvToast.addSocialsCopiedToast(it.url)
                     } else {
-                        Util.getPlatform().openUri(it.url)
+                        McClient.openUri(it.url)
                     }
                 }
                 builder.withAlignment(OverlayAlignment.TOP_LEFT)

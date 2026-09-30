@@ -15,49 +15,50 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - name: Set up JDK 25
-        uses: actions/setup-java@v5
-        with:
-          distribution: 'microsoft'
-          java-version: '25'
+    build:
+        runs-on: ubuntu-latest
+        strategy:
+            matrix:
+                version: [ '26.1', '26.2', '26.3' ]
+        steps:
+            -   uses: actions/checkout@v5
+            -   name: Setup JDK 25
+                uses: actions/setup-java@v5
+                with:
+                    distribution: temurin
+                    java-version: '25'
+            -   name: Setup gradle
+                uses: gradle/actions/setup-gradle@v5
+            -   run: chmod +x gradlew
+            -   name: Build
+                run: ./gradlew :${{ matrix.version }}:build
+            -   name: Upload Artifact ${{ matrix.version }}
+                uses: actions/upload-artifact@v7.0.0
+                with:
+                    archive: false
+                    path: build/libs/*-${{ matrix.version }}.jar
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v5
-        with:
-          cache-disabled: true
-      - run: chmod +x gradlew
-      - name: Build with Gradle
-        run: ./gradlew build
-
-      - name: Upload artifact (26.2)
-        uses: actions/upload-artifact@v7
-        with:
-          name: SkyBlockPv-26.2
-          path: build/libs/*-26.2.jar
-
-      - name: Upload artifact (26.1)
-        uses: actions/upload-artifact@v7
-        with:
-          name: SkyBlockPv-26.1
-          path: build/libs/*-26.1.jar
-
-      # Rolling release: reuses the fixed "latest" tag, so every run overwrites the
-      # same release and the repo's Latest release is always the freshest build.
-      # The jars are MC-version-specific; both are attached to the single release.
-      - name: Publish GitHub Release (rolling "latest")
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: latest
-          name: Latest build
-          target_commitish: ${{ github.sha }}
-          files: |
-            build/libs/*-26.2.jar
-            build/libs/*-26.1.jar
-          make_latest: true
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+    # Rolling release: runs ONCE after all matrix legs finish, so the single
+    # "latest" release carries every MC-version jar. Reuses the fixed "latest"
+    # tag, so each run overwrites the same release and the repo's Latest release
+    # is always the freshest build.
+    release:
+        needs: build
+        runs-on: ubuntu-latest
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        steps:
+            -   name: Download build artifacts
+                uses: actions/download-artifact@v4
+                with:
+                    path: release-assets
+            -   name: Publish GitHub Release (rolling "latest")
+                uses: softprops/action-gh-release@v2
+                with:
+                    tag_name: latest
+                    name: Latest build
+                    target_commitish: ${{ github.sha }}
+                    files: release-assets/**
+                    make_latest: true
+                    generate_release_notes: true
+                env:
+                    GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
