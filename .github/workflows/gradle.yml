@@ -39,26 +39,83 @@ jobs:
                     path: build/libs/*-${{ matrix.version }}.jar
 
     # Rolling release: runs ONCE after all matrix legs finish, so the single
-    # "latest" release carries every MC-version jar. Reuses the fixed "latest"
-    # tag, so each run overwrites the same release and the repo's Latest release
-    # is always the freshest build.
+    # "latest" release carries every MC-version jar.
+    #
+    # We publish it deterministically with curl + the built-in GITHUB_TOKEN
+    # instead of softprops/action-gh-release, which is stateful and NOT
+    # idempotent against a fixed "latest" tag (it deletes all existing assets
+    # first, then re-uploads — a transient failure mid-way, e.g. a secondary
+    # rate limit, leaves the release in a broken/partial state). This job:
+    #   1. moves the 'latest' tag to the new commit,
+    #   2. atomically deletes any existing 'latest' release (drops ALL its
+    #      assets in a single call, which also self-heals any broken state),
+    #   3. creates a fresh 'latest' release,
+    #   4. uploads exactly the built SkyBlockPv jars.
+    # Reusing the fixed "latest" tag means each run overwrites the same
+    # release, so the repo's Latest release is always the freshest build.
     release:
         needs: build
         runs-on: ubuntu-latest
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        env:
+            GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+            GH_SHA: "${{ github.sha }}"
         steps:
             -   name: Download build artifacts
                 uses: actions/download-artifact@v4
                 with:
                     path: release-assets
-            -   name: Publish GitHub Release (rolling "latest")
-                uses: softprops/action-gh-release@v2
-                with:
-                    tag_name: latest
-                    name: Latest build
-                    target_commitish: ${{ github.sha }}
-                    files: release-assets/**
-                    make_latest: true
-                    generate_release_notes: true
-                env:
-                    GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+            -   name: Publish GitHub Release (rolling "latest", deterministic)
+                run: |
+                    set -euo pipefail
+                    BASE="https://api.github.com/repos/${GITHUB_REPOSITORY}"
+                    AUTH=(-H "Authorization: token ${GH_TOKEN}")
+                    CT=(-H "Content-Type: application/json")
+
+                    # Collect the built jars (one per MC version). download-artifact
+                    # (archive:false) places each matrix artifact in its own
+                    # subfolder, so glob for jars under any subfolder.
+                    shopt -s nullglob
+                    JARS=( release-assets/*/SkyBlockPv-*.jar release-assets/SkyBlockPv-*.jar )
+                    shopt -u nullglob
+                    # De-dup (in case a jar is matched by both patterns).
+                    mapfile -t JARS < <(printf '%s\n' "${JARS[@]}" | sort -u)
+                    if [ ${#JARS[@]} -eq 0 ]; then
+                        echo "::error::No SkyBlockPv-*.jar found under release-assets/"
+                        ls -laR release-assets
+                        exit 1
+                    fi
+                    echo "Jars to publish:"
+                    ls -l "${JARS[@]}"
+
+                    # 1) Move (or create) the 'latest' tag to this commit.
+                    curl -sf -X DELETE "${AUTH[@]}" "${BASE}/git/refs/tags/latest" || true
+                    curl -sf -X POST "${AUTH[@]}" "${CT[@]}" \
+                        -d "{\"ref\":\"refs/tags/latest\",\"sha\":\"${GH_SHA}\"}" \
+                        "${BASE}/git/refs"
+
+                    # 2) Delete any existing 'latest' release (drops all assets atomically).
+                    REL_ID="$(curl -sf "${AUTH[@]}" "${BASE}/releases/tags/latest" | jq -r '.id // empty')"
+                    if [ -n "${REL_ID}" ]; then
+                        echo "Deleting existing 'latest' release ${REL_ID} (clears stale/broken assets)"
+                        curl -sf -X DELETE "${AUTH[@]}" "${BASE}/releases/${REL_ID}" || true
+                    fi
+
+                    # 3) Create a fresh 'latest' release pointing at this commit.
+                    REL="$(curl -sf -X POST "${AUTH[@]}" "${CT[@]}" \
+                        -d "{\"tag_name\":\"latest\",\"name\":\"Latest build\",\"target_commitish\":\"${GH_SHA}\",\"make_latest\":\"true\",\"generate_release_notes\":true}" \
+                        "${BASE}/releases")"
+                    NEW_ID="$(printf '%s' "${REL}" | jq -r '.id')"
+                    UP_URL="$(printf '%s' "${REL}" | jq -r '.upload_url')"
+                    echo "Created release ${NEW_ID}"
+
+                    # 4) Upload each jar (name preserves the MC-version suffix).
+                    for j in "${JARS[@]}"; do
+                        f="$(basename "${j}")"
+                        echo "Uploading ${f}"
+                        curl -sf -X POST "${AUTH[@]}" \
+                            -H "Content-Type: application/java-archive" \
+                            --data-binary "@${j}" \
+                            "${UP_URL}?name=${f}"
+                    done
+                    echo "Done: published release ${NEW_ID} with ${#JARS[@]} jar(s)"
