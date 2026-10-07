@@ -111,7 +111,14 @@ jobs:
                         -d "{\"tag_name\":\"latest\",\"name\":\"Latest build\",\"target_commitish\":\"${GH_SHA}\",\"make_latest\":\"true\",\"generate_release_notes\":true}" \
                         "${BASE}/releases")"
                     NEW_ID="$(printf '%s' "${REL}" | jq -r '.id')"
+                    # The API returns upload_url as a URL TEMPLATE with a
+                    # "{?name,label}" placeholder suffix (e.g.
+                    # https://uploads.github.com/.../releases/405251637/assets{?name,label}).
+                    # Appending "?name=X" AFTER that literal template yields a malformed
+                    # URL (assets{?name,label}?name=X) and GitHub rejects the upload, so
+                    # strip the template suffix first.
                     UP_URL="$(printf '%s' "${REL}" | jq -r '.upload_url')"
+                    UP_URL="${UP_URL%\{?name,label\}}"
                     echo "Created release ${NEW_ID}"
 
                     # 4) Upload each jar (name preserves the MC-version suffix).
