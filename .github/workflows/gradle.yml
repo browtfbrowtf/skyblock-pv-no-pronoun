@@ -95,7 +95,12 @@ jobs:
                         "${BASE}/git/refs"
 
                     # 2) Delete any existing 'latest' release (drops all assets atomically).
-                    REL_ID="$(curl -sf "${AUTH[@]}" "${BASE}/releases/tags/latest" | jq -r '.id // empty')"
+                    # Tolerate a missing release: without the '|| true' guard, a 404 here
+                    # (which happens after a prior run deleted the release and then failed
+                    # before recreating it) makes 'curl -sf' exit 22; under 'set -euo
+                    # pipefail' that aborts the job BEFORE the create step, so the release
+                    # can never be self-healed. Treat a 404 as "nothing to delete".
+                    REL_ID="$(curl -sf "${AUTH[@]}" "${BASE}/releases/tags/latest" | jq -r '.id // empty' || true)"
                     if [ -n "${REL_ID}" ]; then
                         echo "Deleting existing 'latest' release ${REL_ID} (clears stale/broken assets)"
                         curl -sf -X DELETE "${AUTH[@]}" "${BASE}/releases/${REL_ID}" || true
