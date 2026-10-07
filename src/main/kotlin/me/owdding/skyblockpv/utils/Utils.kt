@@ -46,7 +46,6 @@ import tech.thatgravyboat.skyblockapi.utils.json.Json.readJson
 import tech.thatgravyboat.skyblockapi.utils.json.Json.toData
 import tech.thatgravyboat.skyblockapi.utils.json.Json.toDataOrThrow
 import tech.thatgravyboat.skyblockapi.utils.text.Text
-import tech.thatgravyboat.skyblockapi.utils.text.TextStyle.shadowColor
 import tech.thatgravyboat.skyblockapi.utils.text.TextUtils.splitLines
 import java.nio.file.Files
 import java.security.MessageDigest
@@ -60,7 +59,7 @@ import kotlin.jvm.optionals.getOrNull
 
 object Utils {
 
-    var preferedProfileId: UUID? = null
+    var preferredProfileId: UUID? = null
 
     val threadNumber = AtomicInteger(1)
     val executorPool: ExecutorService = Executors.newFixedThreadPool(12) { runnable ->
@@ -73,6 +72,7 @@ object Utils {
 
     var lastTab: PvPageState? = null
 
+    fun getMinecraftItem(id: Identifier): ItemStack = BuiltInRegistries.ITEM.getValue(id).defaultInstance
     fun getMinecraftItem(id: String): ItemStack = BuiltInRegistries.ITEM.getValue(Identifier.withDefaultNamespace(id)).defaultInstance
 
     fun <K, V> MutableMap<K, V>.removeIf(predicate: (Map.Entry<K, V>) -> Boolean): MutableMap<K, V> = also { entries.removeIf(predicate) }
@@ -202,7 +202,6 @@ object Utils {
     }
 
     fun whiteText(text: String = "", init: MutableComponent.() -> Unit = {}) = text(text, PvColors.WHITE.toUInt(), init)
-    fun MutableComponent.append(text: String, init: MutableComponent.() -> Unit): MutableComponent = this.append(Text.of(text, init))
 
     fun String.toUuid(): UUID? = runCatching {
         when (this.length) {

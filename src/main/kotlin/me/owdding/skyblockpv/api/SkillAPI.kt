@@ -55,7 +55,14 @@ object SkillAPI {
         MINING,
         FORAGING {
             override fun hasFloatingLevelCap() = true
-            override fun maxLevel(profile: SkyBlockProfile) = (profile.foraging?.foragingLevelCap ?: 0) + 50
+            override fun maxLevel(profile: SkyBlockProfile): Int {
+                var base = 50
+                base += profile.foraging?.foragingLevelCap ?: 0
+                if (CollectionAPI.hasCollectionTier(profile, "FIG_LOG", 9)) base++
+                if (CollectionAPI.hasCollectionTier(profile, "MANGROVE_LOG", 9)) base++
+                if (CollectionAPI.hasCollectionTier(profile, "HELIX_LOG", 9)) base++
+                return base
+            }
         },
         ENCHANTING,
         ALCHEMY,
