@@ -74,12 +74,15 @@ jobs:
 
                     # Collect the built jars (one per MC version). download-artifact
                     # (archive:false) places each matrix artifact in its own
-                    # subfolder, so glob for jars under any subfolder.
-                    shopt -s nullglob
-                    JARS=( release-assets/*/SkyBlockPv-*.jar release-assets/SkyBlockPv-*.jar )
-                    shopt -u nullglob
-                    # De-dup (in case a jar is matched by both patterns).
-                    mapfile -t JARS < <(printf '%s\n' "${JARS[@]}" | sort -u)
+                    # subfolder named AFTER the artifact — which itself ends in
+                    # .jar (e.g. release-assets/SkyBlockPv-1.9.2-26.2.jar/
+                    # SkyBlockPv-1.9.2-26.2.jar). The old shell glob
+                    # 'release-assets/*/SkyBlockPv-*.jar' therefore matched BOTH
+                    # the per-artifact DIRECTORY and the jar file inside it, and
+                    # 'curl --data-binary @<directory>' dies with exit 26
+                    # (CURLE_READ_ERROR). 'find ... -type f' only ever matches
+                    # real files, so the directory can never slip in.
+                    mapfile -t JARS < <(find release-assets -type f -name "SkyBlockPv-*.jar" | sort -u)
                     if [ ${#JARS[@]} -eq 0 ]; then
                         echo "::error::No SkyBlockPv-*.jar found under release-assets/"
                         ls -laR release-assets
