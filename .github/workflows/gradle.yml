@@ -65,6 +65,18 @@ jobs:
                 uses: actions/download-artifact@v4
                 with:
                     path: release-assets
+            -   name: Dump release-assets layout (diagnostic)
+                run: |
+                    mkdir -p /tmp/ra-diag
+                    ( cd release-assets && find . | sort ) > /tmp/ra-diag/find.txt
+                    ( cd release-assets && ls -laR ) > /tmp/ra-diag/ls.txt
+            -   name: Upload layout diagnostic
+                if: ${{ always() }}
+                uses: actions/upload-artifact@v7
+                with:
+                    name: ra-diag
+                    path: /tmp/ra-diag
+                    archive: false
             -   name: Publish GitHub Release (rolling "latest", deterministic)
                 run: |
                     set -euo pipefail
@@ -72,19 +84,17 @@ jobs:
                     AUTH=(-H "Authorization: token ${GH_TOKEN}")
                     CT=(-H "Content-Type: application/json")
 
-                    # Collect the built jars (one per MC version). download-artifact
-                    # (archive:false) places each matrix artifact in its own
-                    # subfolder named AFTER the artifact — which itself ends in
-                    # .jar (e.g. release-assets/SkyBlockPv-1.9.2-26.2.jar/
-                    # SkyBlockPv-1.9.2-26.2.jar). The old shell glob
-                    # 'release-assets/*/SkyBlockPv-*.jar' therefore matched BOTH
-                    # the per-artifact DIRECTORY and the jar file inside it, and
+                    # Collect the built jars (one per MC version). Use 'find
+                    # -type f' so only real files are matched — a shell glob like
+                    # 'release-assets/*/*.jar' also matched per-artifact
+                    # DIRECTORIES named *.jar (download-artifact names the
+                    # subfolder after the artifact), and
                     # 'curl --data-binary @<directory>' dies with exit 26
-                    # (CURLE_READ_ERROR). 'find ... -type f' only ever matches
-                    # real files, so the directory can never slip in.
-                    mapfile -t JARS < <(find release-assets -type f -name "SkyBlockPv-*.jar" | sort -u)
+                    # (CURLE_READ_ERROR). Match any *.jar for now so this run
+                    # also reveals the exact layout; tighten once confirmed.
+                    mapfile -t JARS < <(find release-assets -type f -name "*.jar" | sort -u)
                     if [ ${#JARS[@]} -eq 0 ]; then
-                        echo "::error::No SkyBlockPv-*.jar found under release-assets/"
+                        echo "::error::No .jar found under release-assets/ (layout dumped to ra-diag artifact)"
                         ls -laR release-assets
                         exit 1
                     fi
