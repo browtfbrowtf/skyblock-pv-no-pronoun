@@ -35,6 +35,12 @@ jobs:
             -   name: Upload Artifact ${{ matrix.version }}
                 uses: actions/upload-artifact@v7.0.0
                 with:
+                    # UNIQUE name per matrix leg. Without 'name' every leg
+                    # uploads under the default name "artifact"; download-artifact
+                    # then extracts ALL of them into the SAME release-assets/artifact/
+                    # directory, so the three mod jars collide and only one survives
+                    # (the release ended up with a single 26.2 asset).
+                    name: SkyBlockPv-${{ matrix.version }}
                     # IMPORTANT: keep the default archive:true. download-artifact
                     # has NO 'extract' input (v4/v5) — it ALWAYS extracts. With
                     # archive:false the stored artifact is the raw mod jar (itself
