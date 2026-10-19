@@ -68,14 +68,21 @@ jobs:
             -   name: Dump release-assets layout (diagnostic)
                 run: |
                     mkdir -p /tmp/ra-diag
-                    ( cd release-assets && find . | sort ) > /tmp/ra-diag/find.txt
-                    ( cd release-assets && ls -laR ) > /tmp/ra-diag/ls.txt
+                    {
+                      echo "===== find . (sorted) ====="
+                      ( cd release-assets 2>/dev/null && find . | sort ) || echo "release-assets dir missing"
+                      echo "===== ls -laR ====="
+                      ( cd release-assets 2>/dev/null && ls -laR ) || true
+                      echo "===== find -type f -name '*.jar' ====="
+                      find release-assets -type f -name "*.jar" 2>/dev/null || true
+                    } > /tmp/ra-diag/layout.txt
             -   name: Upload layout diagnostic
                 if: ${{ always() }}
+                continue-on-error: true
                 uses: actions/upload-artifact@v7
                 with:
                     name: ra-diag
-                    path: /tmp/ra-diag
+                    path: /tmp/ra-diag/layout.txt
                     archive: false
             -   name: Publish GitHub Release (rolling "latest", deterministic)
                 run: |
