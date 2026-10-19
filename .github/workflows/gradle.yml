@@ -62,9 +62,21 @@ jobs:
             GH_SHA: "${{ github.sha }}"
         steps:
             -   name: Download build artifacts
-                uses: actions/download-artifact@v4
+                uses: actions/download-artifact@v5
                 with:
                     path: release-assets
+                    # CRITICAL: v4/v5 EXTRACT the uploaded archive by default.
+                    # Our artifacts were uploaded with archive:false, i.e. the
+                    # raw mod jar IS the stored archive — extracting it unpacks
+                    # the jar (a zip) into a DIRECTORY named
+                    # SkyBlockPv-<ver>-<mc>.jar/ containing its innards, and
+                    # find -name '*.jar' then matches only the embedded
+                    # dependency jars under META-INF/jars/ (meowdding-lib,
+                    # olympus, resourcefullib, ...). Worse, identical dep jars
+                    # appear under every MC-version dir, so a duplicate asset
+                    # name 422s the upload (curl exit 22). extract:false keeps
+                    # each artifact as the real top-level mod jar.
+                    extract: false
             -   name: Dump release-assets layout (diagnostic)
                 run: |
                     mkdir -p /tmp/ra-diag
