@@ -10,19 +10,21 @@ import me.owdding.skyblockpv.api.data.profile.SkyBlockProfile
 import me.owdding.skyblockpv.data.api.Attribute
 import me.owdding.skyblockpv.data.repo.AttributesData
 import me.owdding.skyblockpv.screens.windowed.tabs.base.GroupedScreen
+import me.owdding.skyblockpv.utils.Utils
 import me.owdding.skyblockpv.utils.Utils.skipUntil
 import me.owdding.skyblockpv.utils.Utils.toDateTime
 import net.minecraft.client.gui.layouts.Layout
 import net.minecraft.network.chat.CommonComponents.space
 import net.minecraft.util.ARGB
+import net.minecraft.world.item.ItemStack
 import net.minecraft.world.item.Items
-import sun.management.MemoryUsageCompositeData.getMax
 import tech.thatgravyboat.repolib.api.AttributesAPI
 import tech.thatgravyboat.repolib.api.RepoAPI
 import tech.thatgravyboat.skyblockapi.api.data.SkyBlockRarity
 import tech.thatgravyboat.skyblockapi.api.repo.apis.SkyBlockAttributesRepo
 import tech.thatgravyboat.skyblockapi.helpers.McClient
 import tech.thatgravyboat.skyblockapi.utils.builders.TooltipBuilder
+import tech.thatgravyboat.skyblockapi.utils.extentions.getRawLore
 import tech.thatgravyboat.skyblockapi.utils.extentions.stripColor
 import tech.thatgravyboat.skyblockapi.utils.text.TextBuilder.append
 import tech.thatgravyboat.skyblockapi.utils.text.TextColor
@@ -75,6 +77,7 @@ class AttributeScreen(gameProfile: GameProfile, profile: SkyBlockProfile? = null
         val (repo, _) = data
         val query = query
         if (query == null || repo == null) return true
+        val item = SkyBlockAttributesRepo.getItemStack(repo.id())
         return buildList {
             add(repo.name)
             add(repo.shardId)
@@ -82,8 +85,7 @@ class AttributeScreen(gameProfile: GameProfile, profile: SkyBlockProfile? = null
             add(repo.shardName)
             add(repo.attributeId)
             add(repo.rarity)
-            @Suppress("DEPRECATION")
-            addAll(repo.lore)
+            addAll(item?.getRawLore() ?: listOf())
         }.map { it.stripColor() }.any { it.contains(query, ignoreCase = true) }
     }
 
@@ -104,9 +106,9 @@ class AttributeScreen(gameProfile: GameProfile, profile: SkyBlockProfile? = null
         return Displays.item(
             when {
                 repo?.let(::getMax) != 0 && (api == null || api.syphoned <= 0) && filter != Filter.LOCKED -> Items.DYE.gray().defaultInstance
-                else -> item ?: Items.BARRIER.defaultInstance
+                else -> item ?: Utils.failedTestBlockStack()
             },
-        ).withTooltip { getAttributeTooltip(group, repo, api) }
+        ).withTooltip { getAttributeTooltip(group, repo, api, item) }
     }
 
     companion object {
@@ -116,7 +118,7 @@ class AttributeScreen(gameProfile: GameProfile, profile: SkyBlockProfile? = null
         }
 
         context(builder: TooltipBuilder)
-        fun getAttributeTooltip(rarity: SkyBlockRarity?, repo: AttributesAPI.Attribute?, api: Attribute?) {
+        fun getAttributeTooltip(rarity: SkyBlockRarity?, repo: AttributesAPI.Attribute?, api: Attribute?, item: ItemStack?) {
             val max = repo?.let(::getMax) ?: -1
 
             if (repo == null) {
@@ -130,9 +132,8 @@ class AttributeScreen(gameProfile: GameProfile, profile: SkyBlockProfile? = null
 
                     color = rarity?.color ?: -1
                 }
-                @Suppress("DEPRECATION")
-                ListMerger(repo.lore).apply {
-                    addUntil { it.stripColor().startsWith("You can Syphon this shard") }
+                ListMerger(item?.getRawLore() ?: emptyList()).apply {
+                    addUntil { it.startsWith("You can Syphon this shard") }
                     skipUntil { it.endsWith("SHARD") }
 
                     addRemaining()

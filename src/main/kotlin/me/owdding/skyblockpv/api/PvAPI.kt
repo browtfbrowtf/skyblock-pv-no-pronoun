@@ -41,7 +41,7 @@ object PvAPI {
 
     @Subscription
     @OnlyOnSkyBlock
-    fun onTick(event: TickEvent) {
+    private fun onTick(event: TickEvent) {
         scheduledSendMessage?.let {
             it().sendWithPrefix()
             scheduledSendMessage = null
@@ -49,7 +49,7 @@ object PvAPI {
     }
 
     @Subscription
-    fun onCommand(event: RegisterCommandsEvent) {
+    private fun onCommand(event: RegisterCommandsEvent) {
         event.registerWithCallback("sbpv refreshauth") {
             val now = currentInstant()
             if (now - lastAuthTry < 1.minutes) {
@@ -80,6 +80,7 @@ object PvAPI {
     fun isAuthenticated(): Boolean = key != null && !failedToAuth
 
     suspend fun authenticate(bypassCaches: Boolean = false) {
+        SkyBlockPv.info("Authenticating with the API.")
         try {
             val server = UUID.randomUUID().toString()
             val user = McClient.self.user
@@ -133,7 +134,7 @@ object PvAPI {
         } else if (response.statusCode == 401) {
             authenticate()
             if (this.key != null) {
-                return get(endpoint)
+                return get(endpoint, intent)
             } else {
                 failedToAuth = true
                 SkyBlockPv.error(AUTHENTICATION_FAILED_MESSAGE)
