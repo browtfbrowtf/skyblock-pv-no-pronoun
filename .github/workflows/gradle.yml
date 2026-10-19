@@ -35,7 +35,16 @@ jobs:
             -   name: Upload Artifact ${{ matrix.version }}
                 uses: actions/upload-artifact@v7.0.0
                 with:
-                    archive: false
+                    # IMPORTANT: keep the default archive:true. download-artifact
+                    # has NO 'extract' input (v4/v5) — it ALWAYS extracts. With
+                    # archive:false the stored artifact is the raw mod jar (itself
+                    # a zip), so download unpacks the jar into a DIRECTORY named
+                    # SkyBlockPv-<ver>-<mc>.jar/ full of class files + embedded
+                    # deps under META-INF/jars/. find -name '*.jar' then matches
+                    # only those embedded dependency jars (which duplicate across
+                    # MC versions -> 422 'already exists' on upload, curl exit 22).
+                    # With archive:true the artifact is a zip CONTAINING the jar;
+                    # extraction yields the real top-level mod jar.
                     path: build/libs/*-${{ matrix.version }}.jar
 
     # Rolling release: runs ONCE after all matrix legs finish, so the single
@@ -65,18 +74,10 @@ jobs:
                 uses: actions/download-artifact@v5
                 with:
                     path: release-assets
-                    # CRITICAL: v4/v5 EXTRACT the uploaded archive by default.
-                    # Our artifacts were uploaded with archive:false, i.e. the
-                    # raw mod jar IS the stored archive — extracting it unpacks
-                    # the jar (a zip) into a DIRECTORY named
-                    # SkyBlockPv-<ver>-<mc>.jar/ containing its innards, and
-                    # find -name '*.jar' then matches only the embedded
-                    # dependency jars under META-INF/jars/ (meowdding-lib,
-                    # olympus, resourcefullib, ...). Worse, identical dep jars
-                    # appear under every MC-version dir, so a duplicate asset
-                    # name 422s the upload (curl exit 22). extract:false keeps
-                    # each artifact as the real top-level mod jar.
-                    extract: false
+                    # NOTE: there is no 'extract' input here — this action ALWAYS
+                    # extracts the uploaded zip. Each artifact lands in
+                    # release-assets/<artifact-name>/<file>.jar. The real fix for
+                    # the unpacked-jar problem is archive:true on the upload side.
             -   name: Dump release-assets layout (diagnostic)
                 run: |
                     mkdir -p /tmp/ra-diag
