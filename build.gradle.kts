@@ -43,9 +43,9 @@ loom.apply {
     log4jConfigs.from(rootProject.layout.projectDirectory.file("gradle/log4j.config.xml"))
 
     runConfigs["client"].apply {
-        ideConfigGenerated(true)
-        runDir = "../../run"
-        vmArg("-Dfabric.modsFolder=${mcVersion}Mods")
+        generateRunConfig = true
+        runDirectory = project.file("../../run")
+        jvmArguments.addAll("-Dfabric.modsFolder=${mcVersion}Mods", "-XX:StackShadowPages=32")
     }
 
     if (accessWidenerFile.exists()) {
@@ -83,7 +83,10 @@ tasks.withType<KotlinCompile>().configureEach {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_25)
         allWarningsAsErrors = true
-        optIn.add("kotlin.time.ExperimentalTime")
+        optIn.addAll(
+            "tech.thatgravyboat.skyblockapi.api.events.remote.SkyBlockPvRequired",
+            "kotlin.time.ExperimentalTime"
+        )
         freeCompilerArgs.addAll(
             "-Xnullability-annotations=@org.jspecify.annotations:warn",
             "-Xcontext-sensitive-resolution",
