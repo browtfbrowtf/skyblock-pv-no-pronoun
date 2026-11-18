@@ -40,7 +40,7 @@ import me.owdding.skyblockpv.data.api.skills.farming.ChipsData
 import me.owdding.skyblockpv.data.api.skills.farming.FarmingData
 import me.owdding.skyblockpv.data.api.skills.farming.GardenData
 import me.owdding.skyblockpv.data.repo.EssenceData
-import me.owdding.skyblockpv.data.repo.MagicalPowerCodecs
+import me.owdding.skyblockpv.data.repo.AccessoryPowerCalculator
 import me.owdding.skyblockpv.feature.networth.Networth
 import me.owdding.skyblockpv.feature.networth.NetworthCalculator
 import me.owdding.skyblockpv.utils.ChatUtils.sendWithPrefix
@@ -112,7 +112,7 @@ interface SkyBlockProfile {
 
     val netWorth: CompletableFuture<Networth>
     fun recalculateNetworth(): CompletableFuture<Networth> = netWorth
-    val magicalPower: CompletableFuture<Pair<Int, Component>>
+    val accessoryPower: CompletableFuture<Pair<Int, Component>>
 
     val onStranded: Boolean get() = profileType == ProfileType.STRANDED
     val isOwnProfile get() = selected && id.ensureSelectedProfile()
@@ -131,7 +131,7 @@ private fun <T> CompletableFuture<T>.getNowOrElse(defaultValue: T) = if (this.is
 data class CompletableSkyBlockProfile(override val backingProfile: BackingSkyBlockProfile) : SkyBlockProfile {
     override var netWorth: CompletableFuture<Networth> = NetworthCalculator.calculateNetworthAsync(this)
         private set
-    override val magicalPower: CompletableFuture<Pair<Int, Component>> = MagicalPowerCodecs.calculateMagicalPower(this)
+    override val accessoryPower: CompletableFuture<Pair<Int, Component>> = AccessoryPowerCalculator.calculateAccessoryPower(this)
     override val isEmpty: Boolean get() = false
 
     override fun recalculateNetworth(): CompletableFuture<Networth> {
@@ -404,7 +404,7 @@ data class BackingSkyBlockProfile(
             val perks = this?.asMap { id, amount -> id to amount.asInt(0) } ?: emptyMap()
 
             // perks that are unlocked but not in the repo:
-            val unknownPerks = perks.keys - EssenceData.allPerks.keys
+            val unknownPerks = perks.keys - EssenceData.perks.values.flatMapTo(mutableSetOf()) { it.keys }
 
             if (unknownPerks.isNotEmpty()) {
                 McClient.runNextTick {
